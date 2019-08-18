@@ -1,0 +1,199 @@
+---
+title: "Case Study 2"
+author: "Amber Burnett"
+date: "8/18/2019"
+output: html_document
+---
+
+```{r ATTRITION, echo=TRUE}
+# Project 2: Attrition Model
+case <- read.csv("~/Desktop/CaseStudy2-data.csv")
+test.noatt <- read.csv("~/Desktop/CaseStudy2CompSet No Attrition.csv")
+
+# keep the following variables in the whole training data
+fof <- case[ , c(2:4, 7, 12, 15, 18, 22, 24, 27, 29, 30:36)]
+fof$Turnover <- ifelse(fof$Attrition == "Yes", 1, 0)
+fof$Freq.Travel <- ifelse(fof$BusinessTravel == "Travel_Frequently", 1, 0)
+fof$Over.Time <- ifelse(fof$OverTime == "Yes", 1, 0)
+# drop variables that are string 2,3,9
+fo <- fof[ , c(1, 4:8, 10:21)]
+
+# keep the same variables in the whole testing data
+fos <- test.noatt[ , c(2:3, 6, 11, 14, 17, 21, 23, 26, 28, 29:35)]
+fos$Freq.Travel <- ifelse(fos$BusinessTravel == "Travel_Frequently", 1, 0)
+fos$Over.Time <- ifelse(fos$OverTime == "Yes", 1, 0)
+# drop variables that are string 2,8
+ft <- fos[ , c(1, 3:7, 9:19)]
+
+
+#############################################################
+# Split the whole training data into 2 subsets: one training data: train and one testing data: test
+# To test the accuracy of the model
+ 
+split = 0.6 
+smp_size <- floor(split * nrow(fo))
+
+set.seed(123)
+train_ind <- sample(seq_len(nrow(fo)), size = smp_size)
+
+train <- fo[train_ind, ]
+test <- fo[-train_ind, ]
+
+#############################################################
+
+library(e1071)
+library(caret)
+
+# Run KNN model 
+
+# Method 1
+# column 16 is variable Turnover
+# k=25 has the optimized sensitivity and specificity
+
+results = class::knn(train[ , c(1:15, 17:18)], test[,c(1:15, 17:18)], train$Turnover, k=25)
+
+# Accuracy for the testing data (subset of the big data of case study 2)
+test$Turnover.Pred = results
+confusionMatrix(table(test$Turnover, test$Turnover.Pred))
+
+
+results2 = class::knn(fo[ , c(1:15, 17:18)], ft[,c(1:17)], fo$Turnover, k=25)
+
+# Get Predicted attrition using KNN regression for the validation dataset without actual attrition
+ft$Turnover.Pred = results2
+
+# Export data with predicted attrition
+write.table(ft, "~/Desktop/Case2PredictionsBurnett knn Attrition.csv", sep=",", row.names=F)
+
+#############################################################
+# Run logistic model to compare
+
+library(ISLR)
+
+glm.fit <- glm(Turnover ~ Freq.Travel + Over.Time + Age + DistanceFromHome+ EnvironmentSatisfaction + JobInvolvement + JobSatisfaction + NumCompaniesWorked + RelationshipSatisfaction + StockOptionLevel + TotalWorkingYears + WorkLifeBalance + YearsSinceLastPromotion, data = train, family = binomial)
+summary(glm.fit)
+turnover.prob.tr = predict(glm.fit, train, type="response")
+
+glm.fit <- glm(Turnover ~ Freq.Travel + Over.Time + Age + DistanceFromHome+ EnvironmentSatisfaction + JobInvolvement + JobSatisfaction + NumCompaniesWorked + RelationshipSatisfaction + StockOptionLevel + TotalWorkingYears + WorkLifeBalance + YearsSinceLastPromotion, data = test, family = binomial)
+turnover.prob.te = predict(glm.fit, test, type="response")
+
+# Testing accuracy of the training data -subset of the whole training data (casestudy2data)
+train$turnover.pred = rep(0, dim(train)[1])
+train$turnover.pred[ turnover.prob.tr > .2] = 1
+table(train$turnover.pred, train$Turnover)
+confusionMatrix(table(train$turnover.pred, train$Turnover))
+
+# Testing accuracy of the testing data -subset of the whole training data (casestudy2data)
+test$pred = rep(0, dim(test)[1])
+test$pred[ turnover.prob.te > .2] = 1
+table(test$pred, test$Turnover)
+confusionMatrix(table(test$pred, test$Turnover))
+
+# Success rate of our prediction = 1 -error rate
+
+mean(train$turnover.pred==train$Turnover)
+
+
+# Get Predicted attrition using Logistic regression for the validation dataset without actual attrition
+glm.fit <- glm(Turnover ~ Freq.Travel + Over.Time + Age + DistanceFromHome+ EnvironmentSatisfaction + JobInvolvement + JobSatisfaction + NumCompaniesWorked + RelationshipSatisfaction + StockOptionLevel + TotalWorkingYears + WorkLifeBalance + YearsSinceLastPromotion, data = fo, family = binomial)
+turnover.prob.test = predict(glm.fit, ft, type="response")
+
+ft$Attrition.Pred = rep(0, dim(ft)[1])
+ft$Attrition.Pred[ turnover.prob.test > .2] = 1
+
+# Export data with predicted attrition
+write.table(ft, "~/Desktop/Case2PredictionsBurnett Attrition.csv", sep=",", row.names=F)
+
+
+#############################################################
+```
+
+
+
+
+``````{r SALARY, echo=TRUE}
+# Project 2: Salary Model
+test.salary <- read.csv("~/Desktop/CaseStudy2CompSet No Salary.csv")
+case$Freq.Travel <- ifelse(case$BusinessTravel == "Travel_Frequently", 1, 0)
+test.salary$Freq.Travel <- ifelse(test.salary$BusinessTravel == "Travel_Frequently", 1, 0)
+
+
+#############################################################
+# Split the whole training data into 2 subsets: one training data: train and one testing data: test
+# To test the accuracy of the model
+ 
+split = 0.6 
+smp_size <- floor(split * nrow(case))
+
+set.seed(123)
+train_ind <- sample(seq_len(nrow(case)), size = smp_size)
+
+train <- case[train_ind, ]
+test <- case[-train_ind, ]
+
+#############################################################
+# Use Linear Model to predict monthly income
+
+
+mod <- lm(MonthlyIncome ~ Freq.Travel + TotalWorkingYears + DistanceFromHome + JobLevel + YearsWithCurrManager + JobRole + TotalWorkingYears*JobRole, data=train)
+print(summary(mod))
+
+MSalary.Pred <- predict(mod, test)
+
+# Get the accuracy of the model using testing data: as a subset of the training data (casestudy2 data)
+ASE_lm <- mean((test$MonthlyIncome-MSalary.Pred)^2)
+RMSE <- sqrt(ASE_lm)
+RMSE
+
+# Get the accuracy of the model using the whole training data (casestudy2 data)
+MSalary.Predall <- predict(mod, case)
+ASE_lm_all <- mean((case$MonthlyIncome-MSalary.Predall)^2)
+RMSE_all <- sqrt(ASE_lm_all)
+RMSE_all
+
+# Get Predicted monthly salary using linear regression for the validation dataset without actual salary
+
+mod.all <- lm(MonthlyIncome ~ Freq.Travel + TotalWorkingYears + DistanceFromHome + JobLevel + YearsWithCurrManager + JobRole + TotalWorkingYears*JobRole, data=case)
+print(summary(mod.all))
+
+test.salary$Salary.Pred <- predict(mod.all, test.salary)
+
+# Export data with predicted salary
+write.table(test.salary, "~/Desktop/Case2PredictionsBurnett Salary.csv", sep=",", row.names=F)
+
+#############################################################
+```
+
+
+```{r Plots,echo=TRUE}
+library(corrplot)
+# slide 2
+correlations <- cor(fo[,c(4,5,8,9,16:18)])
+corrplot(correlations, method="circle")
+#slide 3
+ggplot(fof, aes(TotalWorkingYears, Turnover, color=OverTime)) + stat_smooth(method="glm", formula=y~x, alpha=0.2, size=2, aes(fill=OverTime)) + geom_point(position=position_jitter(height=0.01, width=0)) + xlab("TotalWorkingYears") + ylab("Pr(Turnover)")
+#slide 4
+case$Turnover <- ifelse(fof$Attrition == "Yes", 1, 0)
+ggplot(case, aes(JobInvolvement, Turnover, color=JobRole)) + stat_smooth(method="glm", formula=y~x, alpha=0.2, size=2, aes(fill=JobRole)) + geom_point(position=position_jitter(height=0.01, width=0)) + xlab("JobInvolvement") + ylab("Pr(Turnover)")
+#slide 5
+ggplot(case, aes(JobSatisfaction, Turnover, color=JobRole)) + stat_smooth(method="glm", formula=y~x, alpha=0.2, size=2, aes(fill=JobRole)) + geom_point(position=position_jitter(height=0.01, width=0)) + xlab("JobSatisfaction") + ylab("Pr(Turnover)")
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+```
